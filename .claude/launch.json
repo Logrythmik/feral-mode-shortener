@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "shortener",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "set -a; . ./.env.local; set +a; exec /opt/homebrew/bin/go run ."],
+      "port": 8081
+    }
+  ]
+}

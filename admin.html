@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>feralmo.de admin</title>
+<style>
+  :root { --bg:#0a0a0a; --panel:#141414; --line:#2a2a2a; --fg:#e8e8e8; --dim:#8a8a8a; --acid:#b6ff2e; --red:#ff4d4d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .wrap { max-width:860px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:18px; letter-spacing:.12em; text-transform:uppercase; }
+  h1 span { color:var(--acid); }
+  h2 { font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin:32px 0 8px; }
+  input, button { font:inherit; color:inherit; background:var(--panel); border:1px solid var(--line); border-radius:4px; padding:8px 10px; }
+  input:focus { outline:none; border-color:var(--acid); }
+  button { cursor:pointer; }
+  button.primary { background:var(--acid); color:#000; border-color:var(--acid); font-weight:700; }
+  button.danger { color:var(--red); }
+  button.ghost { background:none; border:none; padding:4px 6px; color:var(--dim); }
+  button.ghost:hover { color:var(--fg); }
+  form.create { display:flex; gap:8px; flex-wrap:wrap; }
+  form.create input[name=code] { width:130px; }
+  form.create input[name=targetUrl] { flex:1; min-width:220px; }
+  form.create input[name=description] { flex:1; min-width:160px; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; color:var(--dim); font-weight:400; font-size:12px; padding:6px 8px; border-bottom:1px solid var(--line); }
+  td { padding:8px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-all; }
+  td.num { text-align:right; white-space:nowrap; }
+  a { color:var(--acid); text-decoration:none; }
+  .code { color:var(--acid); font-weight:700; white-space:nowrap; }
+  .dim { color:var(--dim); font-size:12px; }
+  .statsrow td { background:var(--panel); }
+  .bar { background:var(--acid); height:10px; display:inline-block; min-width:2px; vertical-align:middle; }
+  .barline { display:flex; gap:8px; align-items:center; margin:2px 0; }
+  .barline .lbl { width:90px; color:var(--dim); font-size:12px; flex-shrink:0; }
+  #msg { color:var(--red); min-height:20px; margin:8px 0; }
+  #keybar { display:flex; gap:8px; margin:16px 0; }
+  #keybar input { flex:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>feralmo<span>.de</span> — link admin</h1>
+
+  <div id="keybar">
+    <input id="key" type="password" placeholder="admin API key" autocomplete="off">
+    <button class="primary" onclick="saveKey()">CONNECT</button>
+  </div>
+  <div id="msg"></div>
+
+  <div id="app" hidden>
+    <h2>New link</h2>
+    <form class="create" onsubmit="createLink(event)">
+      <input name="code" placeholder="code (optional)" autocomplete="off">
+      <input name="targetUrl" placeholder="https://getferalmode.com/…" required autocomplete="off">
+      <input name="description" placeholder="description" autocomplete="off">
+      <button class="primary">CREATE</button>
+    </form>
+
+    <h2>Links</h2>
+    <table>
+      <thead><tr><th>code</th><th>target</th><th>description</th><th style="text-align:right">clicks</th><th></th></tr></thead>
+      <tbody id="links"></tbody>
+    </table>
+
+    <h2>Top misses <span class="dim">(unknown codes people hit)</span></h2>
+    <div id="misses" class="dim">—</div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let KEY = "";
+try { KEY = localStorage.getItem("feralmo-key") || ""; } catch {}
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { "Authorization": "Bearer " + KEY, "Content-Type": "application/json", ...(opts.headers || {}) },
+  });
+  if (res.status === 204) return null;
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || res.statusText);
+  return body;
+}
+
+function saveKey() {
+  KEY = $("key").value.trim();
+  try { localStorage.setItem("feralmo-key", KEY); } catch {}
+  refresh();
+}
+
+async function refresh() {
+  $("msg").textContent = "";
+  if (!KEY) return;
+  try {
+    const links = await api("/api/links");
+    $("app").hidden = false;
+    $("keybar").hidden = true;
+    renderLinks(links);
+    renderMisses(await api("/api/misses"));
+  } catch (e) {
+    $("app").hidden = true;
+    $("keybar").hidden = false;
+    $("msg").textContent = e.message;
+  }
+}
+
+function renderLinks(links) {
+  $("links").innerHTML = links.length ? links.map(l => `
+    <tr>
+      <td class="code">/${esc(l.code)} <button class="ghost" title="copy" onclick="copyLink('${esc(l.code)}')">⧉</button></td>
+      <td><a href="${esc(l.targetUrl)}" target="_blank" rel="noopener">${esc(l.targetUrl)}</a></td>
+      <td class="dim">${esc(l.description || "")}</td>
+      <td class="num">${l.clicks}</td>
+      <td class="num">
+        <button class="ghost" onclick="toggleStats(this, '${esc(l.code)}')">stats</button>
+        <button class="ghost danger" onclick="removeLink('${esc(l.code)}')">✕</button>
+      </td>
+    </tr>`).join("") : `<tr><td colspan="5" class="dim">no links yet</td></tr>`;
+}
+
+function renderMisses(misses) {
+  $("misses").innerHTML = misses.length
+    ? misses.map(m => `<div>/${esc(m.label)} — ${m.count}</div>`).join("")
+    : "none";
+}
+
+function copyLink(code) {
+  navigator.clipboard.writeText(location.origin + "/" + code);
+}
+
+async function createLink(ev) {
+  ev.preventDefault();
+  const f = ev.target;
+  try {
+    await api("/api/links", { method: "POST", body: JSON.stringify({
+      code: f.code.value || null, targetUrl: f.targetUrl.value, description: f.description.value || null,
+    })});
+    f.reset();
+    refresh();
+  } catch (e) { $("msg").textContent = e.message; }
+}
+
+async function removeLink(code) {
+  if (!confirm(`Delete /${code}? Its click history is kept but the link stops working.`)) return;
+  try { await api("/api/links/" + code, { method: "DELETE" }); refresh(); }
+  catch (e) { $("msg").textContent = e.message; }
+}
+
+async function toggleStats(btn, code) {
+  const row = btn.closest("tr");
+  if (row.nextElementSibling?.classList.contains("statsrow")) { row.nextElementSibling.remove(); return; }
+  try {
+    const s = await api(`/api/links/${code}/stats`);
+    const max = Math.max(1, ...s.clicksByDay.map(d => d.count));
+    const days = s.clicksByDay.map(d =>
+      `<div class="barline"><span class="lbl">${d.day}</span><span class="bar" style="width:${(d.count/max)*200}px"></span> ${d.count}</div>`).join("") || '<span class="dim">no clicks in 30 days</span>';
+    const refs = s.topReferrers.map(r => `<div>${esc(r.label)} — ${r.count}</div>`).join("") || '<span class="dim">none</span>';
+    const tr = document.createElement("tr");
+    tr.className = "statsrow";
+    tr.innerHTML = `<td colspan="5">
+      <b>${s.totalClicks}</b> total clicks<br><br>
+      <span class="dim">LAST 30 DAYS</span>${days}<br>
+      <span class="dim">TOP REFERRERS</span>${refs}
+    </td>`;
+    row.after(tr);
+  } catch (e) { $("msg").textContent = e.message; }
+}
+
+if (KEY) { $("key").value = KEY; refresh(); }
+</script>
+</body>
+</html>
