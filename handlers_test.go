@@ -261,7 +261,9 @@ func TestAdminPageAndHealthz(t *testing.T) {
 	if w := doReq(h, "GET", "/admin", "", ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "feralmo") {
 		t.Errorf("admin page: status = %d", w.Code)
 	}
-	if w := doReq(h, "GET", "/healthz", "", ""); w.Code != http.StatusOK {
-		t.Errorf("healthz: status = %d", w.Code)
+	for _, p := range []string{"/health", "/healthz"} {
+		if w := doReq(h, "GET", p, "", ""); w.Code != http.StatusOK {
+			t.Errorf("%s: status = %d", p, w.Code)
+		}
 	}
 }

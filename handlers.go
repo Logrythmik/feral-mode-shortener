@@ -31,6 +31,9 @@ func newServer(cfg config, store Store, logger *slog.Logger) *server {
 func (s *server) routes() http.Handler {
 	mux := http.NewServeMux()
 
+	// Both spellings: Google's frontend swallows /healthz on *.run.app URLs
+	// (it never reaches the container), so /health is the reliable one.
+	mux.HandleFunc("GET /health", s.handleHealthz)
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /robots.txt", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("User-agent: *\nDisallow: /\n"))

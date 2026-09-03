@@ -16,7 +16,7 @@ applied idempotently on boot; there is no migration step.
 | `GET /<code>` | 302 to the link's target. The incoming query string is appended to the target, so UTM params survive. Codes are case-insensitive. |
 | `GET /` and unknown paths | 302 to `FALLBACK_BASE_URL` (+ path + query). Misses on well-formed codes are logged too. |
 | `GET /admin` | Admin UI (enter the API key once; it's kept in localStorage). |
-| `GET /healthz` | Liveness + DB ping. |
+| `GET /health` | Liveness + DB ping (`/healthz` too, but Google's frontend swallows that path on `*.run.app` URLs). |
 | `GET /robots.txt` | Disallows crawling. |
 
 Admin API (all require `Authorization: Bearer <ADMIN_API_KEY>`):
