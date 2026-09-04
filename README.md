@@ -63,9 +63,9 @@ Lives next to feralmode.studio in project `feral-mode-web` (us-central1):
 Cloud Run service `feral-shortener` (scale-to-zero, 128Mi, distroless image),
 reaching Postgres on the existing `feral-db` VM (`10.128.0.2`) over Direct
 VPC egress. It uses its own `shortener` database on that server — same
-instance, no coupling to the studio's schema. The VM's nightly `pg_dump`
-backup covers only the `feral` database, so add `shortener` to the backup
-script on the VM if the link data matters.
+instance, no coupling to the studio's schema. The VM's nightly backup dumps
+every database on the server (since 2026-09-04), so `shortener` is covered
+automatically.
 
 First-time setup:
 
