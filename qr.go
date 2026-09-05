@@ -33,15 +33,18 @@ func qrWithLogo(content string, size int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// White quiet plate slightly larger than the logo separates it from the
-	// modules; the logo art itself is a black square with the red F.
-	plate := size * 24 / 100
-	logoSize := size * 20 / 100
+	// Scale the FM mark to ~28% of the symbol width, keeping its aspect
+	// ratio, and give it a white quiet border to separate it from the
+	// modules. The covered area stays well under ECC H's 30% budget.
+	lb := logo.Bounds()
+	logoW := size * 28 / 100
+	logoH := logoW * lb.Dy() / lb.Dx()
+	pad := size * 2 / 100
 	center := size / 2
-	plateRect := image.Rect(center-plate/2, center-plate/2, center+plate/2, center+plate/2)
+	plateRect := image.Rect(center-logoW/2-pad, center-logoH/2-pad, center+logoW/2+pad, center+logoH/2+pad)
 	xdraw.Draw(out, plateRect, image.White, image.Point{}, xdraw.Src)
-	logoRect := image.Rect(center-logoSize/2, center-logoSize/2, center+logoSize/2, center+logoSize/2)
-	xdraw.CatmullRom.Scale(out, logoRect, logo, logo.Bounds(), xdraw.Over, nil)
+	logoRect := image.Rect(center-logoW/2, center-logoH/2, center+logoW/2, center+logoH/2)
+	xdraw.CatmullRom.Scale(out, logoRect, logo, lb, xdraw.Over, nil)
 
 	var buf bytes.Buffer
 	if err := png.Encode(&buf, out); err != nil {
