@@ -43,11 +43,17 @@ func (s *server) routes() http.Handler {
 		w.Write(adminHTML)
 	})
 
+	mux.HandleFunc("GET /auth/login", s.handleLogin)
+	mux.HandleFunc("GET /auth/callback", s.handleCallback)
+	mux.HandleFunc("GET /auth/logout", s.handleLogout)
+	mux.HandleFunc("GET /api/me", s.handleMe)
+
 	mux.Handle("GET /api/links", s.requireAdmin(s.handleListLinks))
 	mux.Handle("POST /api/links", s.requireAdmin(s.handleCreateLink))
 	mux.Handle("PATCH /api/links/{code}", s.requireAdmin(s.handleUpdateLink))
 	mux.Handle("DELETE /api/links/{code}", s.requireAdmin(s.handleDeleteLink))
 	mux.Handle("GET /api/links/{code}/stats", s.requireAdmin(s.handleLinkStats))
+	mux.Handle("GET /api/links/{code}/qr.png", s.requireAdmin(s.handleLinkQR))
 	mux.Handle("GET /api/misses", s.requireAdmin(s.handleMisses))
 
 	// Everything else is a candidate short code (or an unknown path that
@@ -67,18 +73,22 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// requireAdmin checks `Authorization: Bearer <ADMIN_API_KEY>` with a
-// constant-time comparison.
+// requireAdmin accepts either `Authorization: Bearer <ADMIN_API_KEY>`
+// (constant-time compare) or a signed Google-session cookie.
 func (s *server) requireAdmin(next http.HandlerFunc) http.Handler {
 	want := sha256.Sum256([]byte(s.cfg.adminAPIKey))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
-		got := sha256.Sum256([]byte(token))
-		if !ok || subtle.ConstantTimeCompare(want[:], got[:]) != 1 {
-			writeError(w, http.StatusUnauthorized, "invalid or missing API key")
+		if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+			got := sha256.Sum256([]byte(token))
+			if subtle.ConstantTimeCompare(want[:], got[:]) == 1 {
+				next(w, r)
+				return
+			}
+		} else if s.sessionEmail(r) != "" {
+			next(w, r)
 			return
 		}
-		next(w, r)
+		writeError(w, http.StatusUnauthorized, "sign in or provide a valid API key")
 	})
 }
 

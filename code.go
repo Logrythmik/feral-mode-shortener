@@ -16,6 +16,7 @@ var codePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 var reservedCodes = map[string]bool{
 	"admin":       true,
 	"api":         true,
+	"auth":        true,
 	"health":      true,
 	"healthz":     true,
 	"favicon.ico": true,

@@ -15,7 +15,8 @@ applied idempotently on boot; there is no migration step.
 | --- | --- |
 | `GET /<code>` | 302 to the link's target. The incoming query string is appended to the target, so UTM params survive. Codes are case-insensitive. |
 | `GET /` and unknown paths | 302 to `FALLBACK_BASE_URL` (+ path + query). Misses on well-formed codes are logged too. |
-| `GET /admin` | Admin UI (enter the API key once; it's kept in localStorage). |
+| `GET /admin` | Admin UI, styled after the studio admin. Sign in with an allowlisted Google account; when OAuth is not configured (local dev) it falls back to the API key. |
+| `GET /auth/login` `/auth/callback` `/auth/logout` | Google OAuth flow. Sessions are HMAC-signed cookies (7 days), keyed off `ADMIN_API_KEY` — rotating the key logs everyone out. |
 | `GET /health` | Liveness + DB ping (`/healthz` too, but Google's frontend swallows that path on `*.run.app` URLs). |
 | `GET /robots.txt` | Disallows crawling. |
 
@@ -28,6 +29,8 @@ Admin API (all require `Authorization: Bearer <ADMIN_API_KEY>`):
 | `PATCH /api/links/{code}` | Update `targetUrl` and/or `description`. |
 | `DELETE /api/links/{code}` | Delete the link (click history is kept; the code starts falling through). |
 | `GET /api/links/{code}/stats` | Total clicks, last-30-days by day, top referrers. |
+| `GET /api/links/{code}/qr.png` | QR code PNG for the short URL (`?size=256..2048`, default 1024) with the FERAL MODE mark centered; ECC level H keeps it scannable. |
+| `GET /api/me` | Auth state for the admin UI (no auth required). |
 | `GET /api/misses` | Most-hit unknown codes — catches typo'd campaign links. |
 
 Analytics per click: timestamp, code, referrer, user agent, client IP
@@ -39,9 +42,12 @@ wait on the database.
 | Env | Meaning |
 | --- | --- |
 | `DATABASE_URL` | Postgres URL (required). |
-| `ADMIN_API_KEY` | Bearer token for `/api/*` and the admin UI (required). |
+| `ADMIN_API_KEY` | Bearer token for `/api/*`; also the session-cookie signing key (required). |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth client for admin sign-in (optional; omit locally). Reuses the studio's OAuth client — its console config must list `https://feralmo.de/auth/callback` as an authorized redirect URI. |
+| `ALLOWED_GOOGLE_EMAILS` | Comma-separated Google accounts allowed into the admin (required when OAuth is on). |
 | `PORT` | Listen port (default 8080). |
 | `FALLBACK_BASE_URL` | Where unknown paths go (default `https://getferalmode.com`). |
+| `PUBLIC_BASE_URL` | Origin encoded into QR codes (default `https://feralmo.de`). |
 
 ## Local development
 

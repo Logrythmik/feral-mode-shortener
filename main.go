@@ -19,24 +19,43 @@ import (
 )
 
 type config struct {
-	port         string
-	databaseURL  string
-	adminAPIKey  string
-	fallbackBase string // no trailing slash
+	port               string
+	databaseURL        string
+	adminAPIKey        string
+	fallbackBase       string // no trailing slash
+	publicBase         string // origin encoded into QR codes, no trailing slash
+	googleClientID     string
+	googleClientSecret string
+	allowedEmails      map[string]bool // lowercase; Google accounts allowed into the admin
 }
 
 func loadConfig() (config, error) {
 	cfg := config{
-		port:         os.Getenv("PORT"),
-		databaseURL:  os.Getenv("DATABASE_URL"),
-		adminAPIKey:  os.Getenv("ADMIN_API_KEY"),
-		fallbackBase: strings.TrimSuffix(os.Getenv("FALLBACK_BASE_URL"), "/"),
+		port:               os.Getenv("PORT"),
+		databaseURL:        os.Getenv("DATABASE_URL"),
+		adminAPIKey:        os.Getenv("ADMIN_API_KEY"),
+		fallbackBase:       strings.TrimSuffix(os.Getenv("FALLBACK_BASE_URL"), "/"),
+		publicBase:         strings.TrimSuffix(os.Getenv("PUBLIC_BASE_URL"), "/"),
+		googleClientID:     os.Getenv("GOOGLE_CLIENT_ID"),
+		googleClientSecret: os.Getenv("GOOGLE_CLIENT_SECRET"),
+		allowedEmails:      map[string]bool{},
+	}
+	for _, e := range strings.Split(os.Getenv("ALLOWED_GOOGLE_EMAILS"), ",") {
+		if e = strings.ToLower(strings.TrimSpace(e)); e != "" {
+			cfg.allowedEmails[e] = true
+		}
 	}
 	if cfg.port == "" {
 		cfg.port = "8080"
 	}
 	if cfg.fallbackBase == "" {
 		cfg.fallbackBase = "https://getferalmode.com"
+	}
+	if cfg.publicBase == "" {
+		cfg.publicBase = "https://feralmo.de"
+	}
+	if cfg.googleClientID != "" && len(cfg.allowedEmails) == 0 {
+		return cfg, errors.New("ALLOWED_GOOGLE_EMAILS must be set when Google OAuth is configured")
 	}
 	if cfg.databaseURL == "" {
 		return cfg, errors.New("DATABASE_URL must be set")
