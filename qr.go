@@ -33,11 +33,11 @@ func qrWithLogo(content string, size int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Scale the FM mark to ~28% of the symbol width, keeping its aspect
+	// Scale the FM mark to ~22% of the symbol width, keeping its aspect
 	// ratio, and give it a white quiet border to separate it from the
 	// modules. The covered area stays well under ECC H's 30% budget.
 	lb := logo.Bounds()
-	logoW := size * 28 / 100
+	logoW := size * 22 / 100
 	logoH := logoW * lb.Dy() / lb.Dx()
 	pad := size * 2 / 100
 	center := size / 2
